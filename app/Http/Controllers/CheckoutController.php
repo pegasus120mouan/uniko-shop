@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Commune;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\ParfumPrice;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,30 +18,45 @@ class CheckoutController extends Controller
     public function index(Request $request): View
     {
         $cart = (array) $request->session()->get('cart', []);
-        $productIds = array_keys($cart);
-
-        $products = Product::query()
-            ->whereIn('id', $productIds)
-            ->get()
-            ->keyBy('id');
 
         $items = [];
         $subtotal = 0.0;
 
-        foreach ($cart as $productId => $qty) {
-            $product = $products->get((int) $productId);
+        foreach ($cart as $cartKey => $cartItem) {
+            if (is_array($cartItem)) {
+                $productId = $cartItem['product_id'] ?? null;
+                $parfumPriceId = $cartItem['parfum_price_id'] ?? null;
+                $qty = max(1, (int) ($cartItem['qty'] ?? 1));
+            } else {
+                $productId = (int) $cartKey;
+                $parfumPriceId = null;
+                $qty = max(1, (int) $cartItem);
+            }
 
+            $product = Product::with('parfum')->find($productId);
             if (!$product) {
                 continue;
             }
 
-            $qty = max(1, (int) $qty);
-            $lineTotal = (float) $product->price * $qty;
+            $parfumPrice = null;
+            $price = (float) $product->price;
+
+            if ($parfumPriceId) {
+                $parfumPrice = ParfumPrice::with('contenant')->find($parfumPriceId);
+                if ($parfumPrice) {
+                    $price = (float) $parfumPrice->prix;
+                }
+            }
+
+            $lineTotal = $price * $qty;
             $subtotal += $lineTotal;
 
             $items[] = [
+                'cart_key' => $cartKey,
                 'product' => $product,
+                'parfum_price' => $parfumPrice,
                 'qty' => $qty,
+                'price' => $price,
                 'line_total' => $lineTotal,
             ];
         }
@@ -96,28 +112,45 @@ class CheckoutController extends Controller
         }
 
         $cart = (array) $request->session()->get('cart', []);
-        $productIds = array_keys($cart);
-
-        $products = Product::query()
-            ->whereIn('id', $productIds)
-            ->get()
-            ->keyBy('id');
 
         $subtotal = 0;
         $resolvedItems = [];
-        foreach ($cart as $productId => $qty) {
-            $product = $products->get((int) $productId);
+
+        foreach ($cart as $cartKey => $cartItem) {
+            if (is_array($cartItem)) {
+                $productId = $cartItem['product_id'] ?? null;
+                $parfumPriceId = $cartItem['parfum_price_id'] ?? null;
+                $qty = max(1, (int) ($cartItem['qty'] ?? 1));
+            } else {
+                $productId = (int) $cartKey;
+                $parfumPriceId = null;
+                $qty = max(1, (int) $cartItem);
+            }
+
+            $product = Product::with('parfum')->find($productId);
             if (!$product) {
                 continue;
             }
 
-            $qty = max(1, (int) $qty);
+            $parfumPrice = null;
             $unitPrice = (int) $product->price;
+            $contenantInfo = null;
+
+            if ($parfumPriceId) {
+                $parfumPrice = ParfumPrice::with('contenant')->find($parfumPriceId);
+                if ($parfumPrice) {
+                    $unitPrice = (int) $parfumPrice->prix;
+                    $contenantInfo = $parfumPrice->contenant->ml . 'ml - ' . $parfumPrice->contenant->type_contenant;
+                }
+            }
+
             $lineTotal = $unitPrice * $qty;
             $subtotal += $lineTotal;
 
             $resolvedItems[] = [
                 'product' => $product,
+                'parfum_price' => $parfumPrice,
+                'contenant_info' => $contenantInfo,
                 'quantity' => $qty,
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
@@ -168,11 +201,15 @@ class CheckoutController extends Controller
             foreach ($resolvedItems as $it) {
                 /** @var \App\Models\Product $product */
                 $product = $it['product'];
+                $contenantInfo = $it['contenant_info'] ?? null;
+                $productName = $contenantInfo 
+                    ? (string) $product->name . ' (' . $contenantInfo . ')'
+                    : (string) $product->name;
 
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $product->id,
-                    'product_name' => (string) $product->name,
+                    'product_name' => $productName,
                     'product_brand' => (string) ($product->brand ?? ''),
                     'unit_price' => (int) $it['unit_price'],
                     'quantity' => (int) $it['quantity'],
@@ -278,6 +315,10 @@ class CheckoutController extends Controller
             $p = $it['product'];
             $brand = trim((string) ($p->brand ?? ''));
             $name = trim((string) $p->name);
+            $contenantInfo = $it['contenant_info'] ?? null;
+            if ($contenantInfo) {
+                $name .= " ({$contenantInfo})";
+            }
             $label = $brand !== '' ? "{$brand} {$name}" : $name;
             $lines[] = "- {$label} x{$it['quantity']} = {$it['line_total']} FCFA";
         }

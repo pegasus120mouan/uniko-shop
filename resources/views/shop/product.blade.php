@@ -62,7 +62,28 @@
           </span>
         </div>
 
-        <div class="mt-4 text-3xl font-semibold">{{ number_format((float) $product->price, 0, ',', ' ') }} FCFA</div>
+        @if ($product->parfum && $product->parfum->prices->count() > 0)
+          <div class="mt-4">
+            <div class="text-sm text-zinc-500 mb-2">Sélectionnez un contenant :</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="contenant-options">
+              @foreach ($product->parfum->prices->sortBy('contenant.ml') as $price)
+                <label class="contenant-option cursor-pointer">
+                  <input type="radio" name="contenant_preview" value="{{ $price->id }}" data-prix="{{ $price->prix }}" class="sr-only peer" {{ $loop->first ? 'checked' : '' }} />
+                  <div class="rounded-xl border-2 border-zinc-200 bg-zinc-50 p-3 text-center transition peer-checked:border-amber-500 peer-checked:bg-amber-50 hover:border-zinc-300">
+                    <div class="font-semibold text-sm">{{ $price->contenant->ml }} ml</div>
+                    <div class="text-xs text-zinc-500 mt-0.5">{{ $price->contenant->type_contenant }}</div>
+                    <div class="font-bold text-amber-600 mt-1">{{ number_format($price->prix, 0, ',', ' ') }} FCFA</div>
+                  </div>
+                </label>
+              @endforeach
+            </div>
+            <div class="mt-3 text-2xl font-semibold" id="selected-price">
+              {{ number_format($product->parfum->prices->sortBy('contenant.ml')->first()->prix, 0, ',', ' ') }} FCFA
+            </div>
+          </div>
+        @else
+          <div class="mt-4 text-3xl font-semibold">{{ number_format((float) $product->price, 0, ',', ' ') }} FCFA</div>
+        @endif
 
         @if ($product->description)
           <p class="mt-5 text-zinc-600 leading-relaxed">{{ $product->description }}</p>
@@ -86,8 +107,20 @@
         <div class="font-semibold">Acheter</div>
         <div class="mt-2 text-sm text-zinc-600">Ajoute au panier puis valide ta commande.</div>
 
-        <form method="POST" action="{{ route('cart.add', $product) }}" class="mt-6 grid gap-3">
+        <form method="POST" action="{{ route('cart.add', $product) }}" class="mt-6 grid gap-3" id="add-to-cart-form">
           @csrf
+          @if ($product->parfum && $product->parfum->prices->count() > 0)
+            <div>
+              <label class="text-sm text-zinc-600">Contenant</label>
+              <select name="parfum_price_id" id="contenant-select" class="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10" required>
+                @foreach ($product->parfum->prices->sortBy('contenant.ml') as $price)
+                  <option value="{{ $price->id }}" data-prix="{{ $price->prix }}">
+                    {{ $price->contenant->ml }} ml - {{ $price->contenant->type_contenant }} ({{ number_format($price->prix, 0, ',', ' ') }} FCFA)
+                  </option>
+                @endforeach
+              </select>
+            </div>
+          @endif
           <div>
             <label class="text-sm text-zinc-600">Quantité</label>
             <input type="number" min="1" max="99" name="qty" value="1" class="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10" />

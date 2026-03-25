@@ -34,4 +34,9 @@ class Product extends Model
     {
         return $this->belongsTo(Category::class);
     }
+
+    public function parfum(): BelongsTo
+    {
+        return $this->belongsTo(Parfum::class);
+    }
 }

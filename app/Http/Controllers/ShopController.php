@@ -69,6 +69,7 @@ class ShopController extends Controller
     {
         $q = (string) $request->query('q', '');
         $categoryId = $request->query('category_id');
+        $parfumType = $request->query('type');
 
         $categories = Category::query()
             ->whereHas('products', function ($q) {
@@ -81,9 +82,14 @@ class ShopController extends Controller
         $products = Product::query()
             ->where('is_active', true)
             ->whereNotNull('parfum_id')
-            ->with('category')
+            ->with(['category', 'parfum.prices.contenant'])
             ->when($categoryId, function ($query) use ($categoryId) {
                 $query->where('category_id', $categoryId);
+            })
+            ->when($parfumType !== null && in_array($parfumType, ['classics', 'luxe']), function ($query) use ($parfumType) {
+                $query->whereHas('parfum', function ($q) use ($parfumType) {
+                    $q->where('type', $parfumType);
+                });
             })
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($q2) use ($q) {
@@ -100,12 +106,15 @@ class ShopController extends Controller
             'q' => $q,
             'categories' => $categories,
             'categoryId' => $categoryId,
+            'parfumType' => $parfumType,
         ]);
     }
 
     public function product(Product $product): View
     {
         abort_unless($product->is_active, 404);
+
+        $product->load('parfum.prices.contenant');
 
         return view('shop.product', [
             'product' => $product,

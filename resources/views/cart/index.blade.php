@@ -25,7 +25,9 @@
         <div class="divide-y divide-zinc-200">
           @foreach ($items as $item)
             @php($p = $item['product'])
-            <div class="p-4 flex items-center gap-4" data-cart-row data-unit-price="{{ (float) $p->price }}">
+            @php($parfumPrice = $item['parfum_price'] ?? null)
+            @php($cartKey = $item['cart_key'])
+            <div class="p-4 flex items-center gap-4" data-cart-row data-unit-price="{{ (float) $item['price'] }}">
               <a href="{{ route('shop.product', $p) }}" class="block flex-none rounded-xl border border-zinc-200 bg-white overflow-hidden" style="width:64px;height:64px;min-width:64px;min-height:64px;">
                 @if (!empty($p->image_path))
                   <img
@@ -42,20 +44,23 @@
               <div class="min-w-0 flex-1">
                 <div class="text-xs text-zinc-500">{{ $p->brand }}</div>
                 <a class="font-medium hover:underline" href="{{ route('shop.product', $p) }}">{{ $p->name }}</a>
-                <div class="text-sm text-zinc-600 mt-1">{{ number_format((float) $p->price, 2, ',', ' ') }}</div>
+                @if ($parfumPrice)
+                  <div class="text-xs text-amber-600 mt-0.5">{{ $parfumPrice->contenant->ml }} ml - {{ $parfumPrice->contenant->type_contenant }}</div>
+                @endif
+                <div class="text-sm text-zinc-600 mt-1">{{ number_format((float) $item['price'], 0, ',', ' ') }} FCFA</div>
               </div>
 
               <div class="w-28">
                 <label class="text-xs text-zinc-500">Qté</label>
-                <input type="number" min="0" max="99" name="items[{{ $p->id }}]" value="{{ $item['qty'] }}" class="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm" data-cart-qty />
+                <input type="number" min="0" max="99" name="items[{{ $cartKey }}]" value="{{ $item['qty'] }}" class="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm" data-cart-qty />
               </div>
 
               <div class="w-28 text-right">
                 <div class="text-xs text-zinc-500">Total</div>
-                <div class="mt-1 font-semibold text-sm" data-cart-line-total>{{ number_format((float) $item['line_total'], 2, ',', ' ') }}</div>
+                <div class="mt-1 font-semibold text-sm" data-cart-line-total>{{ number_format((float) $item['line_total'], 0, ',', ' ') }} FCFA</div>
               </div>
 
-              <button form="remove-{{ $p->id }}" class="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-50" type="submit">Retirer</button>
+              <button form="remove-{{ $cartKey }}" class="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-50" type="submit">Retirer</button>
             </div>
           @endforeach
         </div>
@@ -134,8 +139,8 @@
     </script>
 
     @foreach ($items as $item)
-      @php($p = $item['product'])
-      <form id="remove-{{ $p->id }}" method="POST" action="{{ route('cart.remove', $p) }}" class="hidden">
+      @php($cartKey = $item['cart_key'])
+      <form id="remove-{{ $cartKey }}" method="POST" action="{{ route('cart.remove', $cartKey) }}" class="hidden">
         @csrf
       </form>
     @endforeach
