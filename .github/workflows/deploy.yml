@@ -1,4 +1,4 @@
-name: Deploy Uniko to VPS
+name: Deploy Uniko-Shop to VPS
 
 on:
   push:
